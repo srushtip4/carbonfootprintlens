@@ -4,9 +4,26 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   plugins: [react()],
+  
+  // Optimize build output
+  build: {
+    target: 'ES2020',
+    minify: 'terser',
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'recharts': ['recharts'],
+          'vendor': ['react', 'react-dom', 'react-router-dom'],
+        },
+      },
+    },
+  },
+  
   optimizeDeps: {
     exclude: ['lucide-react'],
+    include: ['react', 'react-dom'],
   },
+  
   test: {
     globals: true,
     environment: 'happy-dom',
