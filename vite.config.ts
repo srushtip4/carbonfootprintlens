@@ -8,7 +8,7 @@ export default defineConfig({
   // Optimize build output
   build: {
     target: 'ES2020',
-    minify: 'terser',
+    minify: 'esbuild',
     rollupOptions: {
       output: {
         manualChunks: {
