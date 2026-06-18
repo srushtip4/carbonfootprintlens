@@ -433,3 +433,63 @@ export async function checkAndAwardBadges(userId: string): Promise<Badge[]> {
   await saveBadges(userId, badges);
   return badges;
 }
+
+
+/**
+ * Query optimization helpers for IndexedDB operations.
+ * Reduces unnecessary iterations and improves lookup performance.
+ */
+
+/** Cache for recently fetched users to reduce DB hits */
+const userCache = new Map<string, User>();
+const CACHE_TTL_MS = 60000; // 1 minute
+
+/** Get user by ID with caching */
+export async function getUserByIdCached(userId: string): Promise<User | null> {
+  const cached = userCache.get(userId);
+  if (cached) return cached;
+
+  const user = await getUserById(userId);
+  if (user) {
+    userCache.set(userId, user);
+    setTimeout(() => userCache.delete(userId), CACHE_TTL_MS);
+  }
+  return user;
+}
+
+/** Batch fetch multiple users efficiently */
+export async function getUsersByIds(userIds: string[]): Promise<Map<string, User>> {
+  const db = await initDb();
+  const store = db.transaction('users', 'readonly').objectStore('users');
+  
+  const results = new Map<string, User>();
+  
+  for (const id of userIds) {
+    const user = await new Promise<User | null>((resolve, reject) => {
+      const req = store.get(id);
+      req.onsuccess = () => resolve(req.result ?? null);
+      req.onerror = () => reject(req.error);
+    });
+    if (user) results.set(id, user);
+  }
+  
+  return results;
+}
+
+/** Get all checkins for a user within a date range */
+export async function getCheckinsInRange(
+  userId: string,
+  startDate: number,
+  endDate: number,
+): Promise<WeeklyCheckin[]> {
+  const db = await initDb();
+  const store = db.transaction('checkins', 'readonly').objectStore('checkins');
+  const index = store.index('userId');
+  
+  return new Promise((resolve, reject) => {
+    const range = IDBKeyRange.bound([userId, startDate], [userId, endDate]);
+    const req = index.getAll(range);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
